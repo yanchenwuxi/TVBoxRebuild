@@ -1,5 +1,5 @@
-# quickjs_rebuild.c —— Bellard QuickJS（quickjs-ng v0.17.0）的 Android JNI 包装
-// 产物：libquickjs_rebuild.so
+// quickjs_rebuild.c - Bellard QuickJS (quickjs-ng v0.17.0) 的 Android JNI 包装
+// 产物: libquickjs_rebuild.so
 //
 // 导出给 Kotlin（见 QuickJSNative.kt 的 @JvmStatic external 声明，包名 com.rebuild.quickjs.native）：
 //   nativeNewContext / nativeFreeContext / nativeEval / nativeCall
