@@ -1,0 +1,81 @@
+name: Build QuickJS native
+
+on:
+  push:
+    branches: [ main, develop ]
+    paths: [ 'libs/quickjs/**', '.github/workflows/quickjs-native.yml' ]
+  workflow_dispatch:
+
+# 合规说明：本工作流只编 Bellard quickjs-ng（MIT）产出的 .so，
+# 不做 Android App 全构建（CI 无真机/模拟器，且 Android 构建慢）。
+# QuickJS C 源码已随仓库提交（libs/quickjs/src/main/jni/quickjs/），CI 不再联网拉取。
+
+jobs:
+  # —— 主验证：arm64-v8a 编 so + 校验 ——
+  quickjs-native:
+    name: 编 QuickJS so（${{ matrix.abi }}）
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # 主 ABI 推主干必跑；其余按需（可注释掉以省 CI 时长）
+        abi: [ arm64-v8a ]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 设 NDK 版本
+        run: echo "ndk=26.1.10909125" >> "$GITHUB_ENV"
+
+      - name: 安装 NDK + CMake（Android SDK，带缓存）
+        uses: android/setup-android@v3
+        with:
+          ndk-version: ${{ env.ndk }}
+          cmake-version: "3.22.1"
+
+      - name: 定位 NDK 工具链
+        run: |
+          export ANDROID_NDK_HOME="$ANDROID_HOME/ndk/${{ env.ndk }}"
+          if [ ! -d "$ANDROID_NDK_HOME" ]; then
+            P=$(find "$ANDROID_HOME" -path "*cmake/android.toolchain.cmake" 2>/dev/null | head -1)
+            export ANDROID_NDK_HOME="$(dirname $(dirname $(dirname "$P")))"
+          fi
+          echo "ANDROID_NDK_HOME=$ANDROID_NDK_HOME" >> "$GITHUB_ENV"
+          ls -d "$ANDROID_NDK_HOME"
+
+      # C 源码已入库，无需拉取；仅做一次存在性断言
+      - name: 断言 QuickJS C 源码在仓库
+        run: |
+          test -f libs/quickjs/src/main/jni/quickjs/quickjs.c || { echo "C 源码缺失"; exit 1; }
+          echo "C 源码 OK（$(ls libs/quickjs/src/main/jni/quickjs/*.c | wc -l) 个 .c）"
+
+      - name: NDK 编 ${{ matrix.abi }}
+        run: ./libs/quickjs/build-native.sh --ndk="$ANDROID_NDK_HOME" --abi=${{ matrix.abi }}
+
+      - name: 校验 so 产物
+        run: |
+          set -e
+          SO=libs/quickjs/src/main/jniLibs/${{ matrix.abi }}/libquickjs_rebuild.so
+          test -f "$SO" || { echo "未产出 $SO"; exit 1; }
+          ls -lh "$SO"; file "$SO"
+
+      - name: 归档 so（主 ABI）
+        if: matrix.abi == 'arm64-v8a'
+        uses: actions/upload-artifact@v4
+        with:
+          name: quickjs-jniLibs-arm64
+          path: libs/quickjs/src/main/jniLibs/arm64-v8a/*.so
+
+  # —— 可选：host 自检（证明 C 源码可编译 + 可执行 JS）——
+  quickjs-host-smoke:
+    name: host 自检 qjs_smoke
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: 装 clang（sudo -E 保留 PATH）
+        run: |
+          sudo apt-get update
+          sudo -E apt-get install -y clang
+      - name: 编 host qjs_smoke 并跑（-DNDEBUG 关 host GC 断言）
+        run: ./libs/quickjs/build-native.sh --host-smoke
+</file_write>
+</invoke>

@@ -1,0 +1,39 @@
+# ---- 构建产物 ----
+.gradle/
+build/
+*/build/
+**/build/
+.kotlin/
+local.properties
+
+# ---- 编译产物 ----
+*.class
+*.dex
+*.so
+# 例外：保留我们自研的 QuickJS C 源码与产物目录（so 由 CI 出，但 .c 是源）
+!libs/quickjs/src/main/jni/quickjs/*.c
+
+# ---- QuickJS C 源码（保留，MIT 可开源）----
+!libs/quickjs/src/main/jni/quickjs/**
+
+# ---- IDE ----
+.idea/
+*.iml
+.DS_Store
+.vscode/
+
+# ---- 日志/缓存 ----
+*.log
+captures/
+.externalNativeBuild/
+
+# ---- 密钥（切勿提交）----
+*.keystore
+!*.jks.example
+*.jks
+server-keys/
+**/session-key.*
+
+# ---- 本地环境 ----
+.env
+*local.properties
