@@ -23,20 +23,34 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # 用官方 android-actions/setup-android（比 android/setup-android 稳）：
-      #   设 ANDROID_NDK_HOME/ANDROID_HOME/ANDROID_SDK_ROOT，且内置 NDK 缓存
-      - name: 安装 NDK + CMake（官方 action，带缓存）
-        uses: android-actions/setup-android@v3
+      # 手动下官方 NDK（绕过已坏的 sdkmanager 包通道；CMake 头即可，无需 Android SDK）
+      # 先 restore 缓存（命中则免 700MB 下载）
+      - name: 恢复 NDK 缓存
+        uses: actions/cache@v4
         with:
-          ndk-version: '26.1.10909125'
-          cmake-true-version: '3.22.1'
+          path: |
+            $HOME/android-ndk
+            $HOME/ndk_ok
+          key: ndk-r26b-linux
 
-      - name: 打印 NDK 环境（排查）
+      - name: 下载并解压官方 NDK（未命中缓存时）
         run: |
-          echo "ANDROID_NDK_HOME=$ANDROID_NDK_HOME"
-          echo "ANDROID_SDK_ROOT=$ANDROID_SDK_ROOT"
-          test -d "$ANDROID_NDK_HOME" || { echo "NDK 目录不存在"; exit 1; }
+          set -e
+          if [ -f "$HOME/ndk_ok" ] && [ -d "$HOME/android-ndk" ]; then
+            echo "缓存命中，跳过 NDK 下载"
+          else
+            URL="https://dl.google.com/android/repository/android-ndk-r26b-linux.zip"
+            echo "下载 $URL （约 700MB）..."
+            curl -fSL "$URL" -o /tmp/ndk.zip
+            mkdir -p "$HOME/android-ndk"
+            unzip -q -o /tmp/ndk.zip -d "$HOME/android-ndk"
+            touch "$HOME/ndk_ok"
+            rm -f /tmp/ndk.zip
+          fi
+          NDK_DIR=$(find "$HOME/android-ndk" -maxdepth 1 -name "android-ndk-*" -type d | head -1)
+          echo "ANDROID_NDK_HOME=$NDK_DIR" >> "$GITHUB_ENV"
           ls "$ANDROID_NDK_HOME/build/cmake/android.toolchain.cmake"
+          echo "NDK 就绪：$ANDROID_NDK_HOME"
 
       # C 源码已入库，无需拉取；仅做一次存在性断言
       - name: 断言 QuickJS C 源码在仓库
@@ -60,6 +74,17 @@ jobs:
         with:
           name: quickjs-jniLibs-arm64
           path: libs/quickjs/src/main/jniLibs/arm64-v8a/*.so
+
+      - name: 缓存 NDK（下次免下载）
+        if: matrix.abi == 'arm64-v8a'
+        uses: actions/cache@v4
+        with:
+          path: |
+            $HOME/android-ndk
+            $HOME/ndk_ok
+          key: ndk-r26b-linux
+          restore-keys: |
+            ndk-r26b-
 
   # —— 可选：host 自检（证明 C 源码可编译 + 可执行 JS）——
   quickjs-host-smoke:
