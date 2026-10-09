@@ -23,24 +23,20 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: 设 NDK 版本
-        run: echo "ndk=26.1.10909125" >> "$GITHUB_ENV"
-
-      - name: 安装 NDK + CMake（Android SDK，带缓存）
-        uses: android/setup-android@v3
+      # 用官方 android-actions/setup-android（比 android/setup-android 稳）：
+      #   设 ANDROID_NDK_HOME/ANDROID_HOME/ANDROID_SDK_ROOT，且内置 NDK 缓存
+      - name: 安装 NDK + CMake（官方 action，带缓存）
+        uses: android-actions/setup-android@v3
         with:
-          ndk-version: ${{ env.ndk }}
-          cmake-version: "3.22.1"
+          ndk-version: '26.1.10909125'
+          cmake-true-version: '3.22.1'
 
-      - name: 定位 NDK 工具链
+      - name: 打印 NDK 环境（排查）
         run: |
-          export ANDROID_NDK_HOME="$ANDROID_HOME/ndk/${{ env.ndk }}"
-          if [ ! -d "$ANDROID_NDK_HOME" ]; then
-            P=$(find "$ANDROID_HOME" -path "*cmake/android.toolchain.cmake" 2>/dev/null | head -1)
-            export ANDROID_NDK_HOME="$(dirname $(dirname $(dirname "$P")))"
-          fi
-          echo "ANDROID_NDK_HOME=$ANDROID_NDK_HOME" >> "$GITHUB_ENV"
-          ls -d "$ANDROID_NDK_HOME"
+          echo "ANDROID_NDK_HOME=$ANDROID_NDK_HOME"
+          echo "ANDROID_SDK_ROOT=$ANDROID_SDK_ROOT"
+          test -d "$ANDROID_NDK_HOME" || { echo "NDK 目录不存在"; exit 1; }
+          ls "$ANDROID_NDK_HOME/build/cmake/android.toolchain.cmake"
 
       # C 源码已入库，无需拉取；仅做一次存在性断言
       - name: 断言 QuickJS C 源码在仓库
