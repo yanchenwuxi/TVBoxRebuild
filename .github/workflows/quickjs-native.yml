@@ -77,5 +77,3 @@ jobs:
           sudo -E apt-get install -y clang
       - name: 编 host qjs_smoke 并跑（-DNDEBUG 关 host GC 断言）
         run: ./libs/quickjs/build-native.sh --host-smoke
-</file_write>
-</invoke>
